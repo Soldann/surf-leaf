@@ -17,6 +17,7 @@ from nerfstudio.models.splatfacto import SplatfactoModel
 from nerfstudio.utils.eval_utils import eval_setup
 from nerfstudio.utils.rich_utils import CONSOLE
 from nerfstudio.data.scene_box import OrientedBox
+from post_processing.mesh_fix import process_mesh
 
 @dataclass
 class SurfLeafMesher:
@@ -52,6 +53,15 @@ class SurfLeafMesher:
     """Margin discard for meshing"""
     max_edge_length: float = 1
     """Maximum edge length for meshing"""
+
+    # Post-processing parameters
+    postprocess_alpha_fraction: float = 0.001
+    """Alpha wrapping ball size fraction (default: 0.001)"""
+    postprocess_stepsmoothnum: int = 1
+    """HC Laplacian smoothing steps (default: 1)"""
+    postprocess_targetperc: float = 0.6
+    """Target percentage reduction for mesh simplification (default: 0.6)"""
+
 
     def main(self):
         if not self.output_dir.exists():
@@ -215,6 +225,19 @@ class SurfLeafMesher:
                 )
                 CONSOLE.print("Saving mesh to ", raw_mesh_path)
                 o3d.io.write_triangle_mesh(raw_mesh_path, mesh_raw)
+
+                clean_mesh_path = str(
+                    self.output_dir
+                    / f"clean_mesh_{surface_level}_{self.return_normal}.ply"
+                )
+                CONSOLE.print("Saving cleaned mesh to ", clean_mesh_path)
+                cleaned_meshset = process_mesh(
+                    mesh_raw, 
+                    alpha_fraction=self.postprocess_alpha_fraction,
+                    stepsmoothnum=self.postprocess_stepsmoothnum,
+                    targetperc=self.postprocess_targetperc
+                )
+                cleaned_meshset.save_current_mesh(clean_mesh_path)
 
 
 def entrypoint():
