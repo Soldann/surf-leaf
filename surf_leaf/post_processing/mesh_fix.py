@@ -6,13 +6,13 @@ import numpy as np
 import time
 
 
-def process_mesh(o3d_imput_mesh, alpha_fraction=0.001, stepsmoothnum=1, targetperc=0.6, print_progress=True):
+def process_mesh(o3d_input_mesh, alpha_fraction=0.001, stepsmoothnum=1, targetperc=0.6, print_progress=True):
     """
     Fixes a mesh by removing isolated pieces, smoothing, applying alpha wrapping,
     and simplifying the mesh.
     
     Parameters:
-    o3d_imput_mesh (open3d.geometry.TriangleMesh): Open3D mesh to be processed.
+    o3d_input_mesh (open3d.geometry.TriangleMesh): Open3D mesh to be processed.
     alpha_fraction (float): The size of the ball (fraction) for alpha wrapping. 
     stepsmoothnum (int): The number of times that the HC Laplacian smoothing algorithm is iterated.
     targetperc (float, 0...1): Target percentage reduction for mesh simplification.
@@ -21,8 +21,8 @@ def process_mesh(o3d_imput_mesh, alpha_fraction=0.001, stepsmoothnum=1, targetpe
     """
 
     # Convert Open3D mesh to PyMeshLab mesh
-    vertices = np.asarray(o3d_imput_mesh.vertices).astype(np.float64)
-    faces = np.asarray(o3d_imput_mesh.triangles).astype(np.int32)
+    vertices = np.asarray(o3d_input_mesh.vertices).astype(np.float64)
+    faces = np.asarray(o3d_input_mesh.triangles).astype(np.int32)
     input_mesh = pymeshlab.Mesh(vertex_matrix=vertices, face_matrix=faces)
 
     # Create a MeshSet object
