@@ -230,13 +230,15 @@ class SurfLeafMesher:
                     self.output_dir
                     / f"clean_mesh_{surface_level}_{self.return_normal}.ply"
                 )
-                CONSOLE.print("Saving cleaned mesh to ", clean_mesh_path)
+                CONSOLE.print("Applying Post-Processing to Mesh... this may take a while.")
                 cleaned_meshset = process_mesh(
                     mesh_raw, 
                     alpha_fraction=self.postprocess_alpha_fraction,
                     stepsmoothnum=self.postprocess_stepsmoothnum,
-                    targetperc=self.postprocess_targetperc
+                    targetperc=self.postprocess_targetperc,
+                    print_progress=False,
                 )
+                CONSOLE.print("Saving cleaned mesh to ", clean_mesh_path)
                 cleaned_meshset.save_current_mesh(clean_mesh_path)
 
 
