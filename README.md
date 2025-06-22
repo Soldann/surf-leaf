@@ -1,1 +1,6 @@
 # Surf-LEAF
+
+Gaussian Splatting is a recent point-based scene representation that yields real-time, high-fidelity novel-view synthesis across wide scenes. Mesh extraction from this representation would enable compatibility with a wide swath of animation, simulation, and urban modeling tasks. Yet on urban scenes the resulting meshes suffer on sharp corners, low-contrast surfaces, and large-scale geometry, which often lead to artifacts such as floaters and oversmoothed meshes.
+
+We present a custom mesh extraction pipeline designed specifically for urban settings. Our approach begins with a surface-level point cloud extraction step optimized to preserve structural detail, followed by an advancing front surface reconstruction algorithm that robustly handles non-uniform point densities and supports scalable processing. Finally, post-processing is applied to repair artifacts and ensure mesh consistency. We evaluate our method on both synthetic (TartanAir) and real-world (Nerfstudio) datasets, showing that it achieves higher mesh fidelity and structural preservation compared to existing techniques.
+Furthermore, our method reduces Chamfer distance by around 10 $\%$ over the strongest baseline (DN-Splatter) on Tartan-Air while using 2-times fewer Gaussians, and it remains a relatively robust meshing duration.
