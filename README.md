@@ -47,24 +47,24 @@ This will load the Gaussian Splatting reconstruction from the specified path and
 
 A full table of parameters:
 
-| Parameter | Type | Default | Description |
-|----------|------|---------|-------------|
-| `load_config` | `Path` | — | Path to the trained config YAML file. |
-| `output_dir` | `Path` | `"./mesh_exports/"` | Path to the output directory. |
-| `total_points` | `int` | `2_000_000` | Total number of surface samples to extract. |
-| `use_masks` | `bool` | `False` | If dataset has masks, use them to restrict surface sampling. |
-| `surface_levels` | `List[float]` | `[0.3]` | Surface level isosurfaces to extract. |
+| Parameter | Type | Default              | Description |
+|----------|------|----------------------|-------------|
+| `load_config` | `Path` | REQUIRED             | Path to the trained config YAML file. |
+| `output_dir` | `Path` | `"./mesh_exports/"`  | Path to the output directory. |
+| `total_points` | `int` | `2_000_000`          | Total number of surface samples to extract. |
+| `use_masks` | `bool` | `False`              | If dataset has masks, use them to restrict surface sampling. |
+| `surface_levels` | `List[float]` | `[0.3]`              | Surface level isosurfaces to extract. |
 | `return_normal` | `"analytical"`, `"closest_gaussian"`, `"average"` | `"closest_gaussian"` | Strategy for estimating normals from Gaussians. |
-| `cropbox_pos` | `Optional[Tuple[float, float, float]]` | `None` | Position of the cropbox center (x, y, z). |
-| `cropbox_rpy` | `Optional[Tuple[float, float, float]]` | `None` | Orientation of cropbox in roll, pitch, yaw (radians). |
-| `cropbox_scale` | `Optional[Tuple[float, float, float]]` | `None` | Scale (size) of the cropbox. |
-| `voxel_size` | `float` | `0.4` | Voxel size used during meshing. |
-| `margin_seam` | `float` | `0.04` | Seam margin used during meshing. |
-| `margin_discard` | `float` | `0.04` | Discard margin used during meshing. |
-| `max_edge_length` | `float` | `1.0` | Maximum triangle edge length in the mesh. |
-| `postprocess_alpha_fraction` | `float` | `0.001` | Alpha wrapping ball size fraction. |
-| `postprocess_stepsmoothnum` | `int` | `1` | Number of HC Laplacian smoothing steps. |
-| `postprocess_targetperc` | `float` | `0.6` | Target reduction percentage for mesh simplification. |
+| `cropbox_pos` | `Optional[Tuple[float, float, float]]` | `None`               | Position of the cropbox center (x, y, z). |
+| `cropbox_rpy` | `Optional[Tuple[float, float, float]]` | `None`               | Orientation of cropbox in roll, pitch, yaw (radians). |
+| `cropbox_scale` | `Optional[Tuple[float, float, float]]` | `None`               | Scale (size) of the cropbox. |
+| `voxel_size` | `float` | `0.4`                | Voxel size used during meshing. |
+| `margin_seam` | `float` | `0.04`               | Seam margin used during meshing. |
+| `margin_discard` | `float` | `0.04`               | Discard margin used during meshing. |
+| `max_edge_length` | `float` | `1.0`                | Maximum triangle edge length in the mesh. |
+| `postprocess_alpha_fraction` | `float` | `0.001`              | Alpha wrapping ball size fraction. |
+| `postprocess_stepsmoothnum` | `int` | `1`                  | Number of HC Laplacian smoothing steps. |
+| `postprocess_targetperc` | `float` | `0.6`                | Target reduction percentage for mesh simplification. |
 
 ## Example
 For our example scene we use the [TartanAir](https://theairlab.org/tartanair-dataset/) dataset, specifically the `abandoned_factory/P001` scene.
