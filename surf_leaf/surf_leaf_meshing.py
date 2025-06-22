@@ -1,7 +1,7 @@
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, Optional, Tuple, Union
+from typing import Literal, List, Optional, Tuple
 
 import numpy as np
 import open3d as o3d
@@ -16,9 +16,12 @@ from nerfstudio.cameras.cameras import Cameras
 from nerfstudio.models.splatfacto import SplatfactoModel
 from nerfstudio.utils.eval_utils import eval_setup
 from nerfstudio.utils.rich_utils import CONSOLE
+from nerfstudio.data.scene_box import OrientedBox
 
 @dataclass
 class SurfLeafMesher:
+    """SurfLEAF: Mesh Extraction using SuGaR Surface Level Extraction with Advancing Front Reconstruction"""
+
     load_config: Path
     """Path to the trained config YAML file."""
     output_dir: Path = Path("./mesh_exports/")
@@ -28,11 +31,18 @@ class SurfLeafMesher:
     """Total target surface samples"""
     use_masks: bool = False
     """If dataset has masks, use these to limit surface sampling regions."""
-    surface_levels: Tuple[float, float, float] = (0.3)
+    surface_levels: List[float] = field(default_factory=lambda: [0.3])
     """Surface levels to extract"""
     return_normal: Literal[
         "analytical", "closest_gaussian", "average"
     ] = "closest_gaussian"
+
+    cropbox_pos: Optional[Tuple[float, float, float]] = None
+    """Position of the cropbox center"""
+    cropbox_rpy: Optional[Tuple[float, float, float]] = None
+    """Roll, pitch, yaw of the cropbox in radians"""
+    cropbox_scale: Optional[Tuple[float, float, float]] = None
+    """Scale of the cropbox"""
 
     voxel_size: float = 0.4
     """Voxel size for meshing"""
@@ -41,6 +51,7 @@ class SurfLeafMesher:
     margin_discard: float = 0.04
     """Margin discard for meshing"""
     max_edge_length: float = 1
+    """Maximum edge length for meshing"""
 
     def main(self):
         if not self.output_dir.exists():
@@ -51,6 +62,23 @@ class SurfLeafMesher:
         assert isinstance(pipeline.model, SplatfactoModel)
 
         model: SplatfactoModel = pipeline.model
+
+        cropbox = None
+
+        if self.cropbox_pos is not None or self.cropbox_rpy is not None or self.cropbox_scale is not None:
+            CONSOLE.print("Applying cropbox to the model.")
+            if self.cropbox_pos is None:
+                self.cropbox_pos = (0.0, 0.0, 0.0)
+            if self.cropbox_rpy is None:
+                self.cropbox_rpy = (0.0, 0.0, 0.0)
+            if self.cropbox_scale is None:
+                self.cropbox_scale = (1.0, 1.0, 1.0)
+
+            cropbox = OrientedBox.from_params(
+                pos=(0.0, 0.0, 0.0),
+                rpy=(0.0, 0.0, 0.0),
+                scale=(2.0, 2.0, 2.0),
+            )
 
         with torch.no_grad():
             cameras: Cameras = pipeline.datamanager.train_dataset.cameras  # type: ignore
@@ -89,6 +117,16 @@ class SurfLeafMesher:
                     img_surface_points = frame_outputs[surface_level]["points"]
                     img_surface_colors = frame_outputs[surface_level]["colors"]
                     img_surface_normals = frame_outputs[surface_level]["normals"]
+
+                    # Apply oriented box crop if specified
+                    if cropbox is not None:
+                        inside_crop = cropbox.within(img_surface_points).squeeze()
+                        if inside_crop.sum() == 0:
+                            continue
+                        img_surface_points = img_surface_points[inside_crop]
+                        img_surface_colors = img_surface_colors[inside_crop]
+                        img_surface_normals = img_surface_normals[inside_crop]
+                        img_surface_sdf = img_surface_sdf[inside_crop]
 
                     surface_levels_outputs[surface_level]["points"] = torch.cat(
                         [
@@ -181,7 +219,7 @@ class SurfLeafMesher:
 
 def entrypoint():
     """Entry point for the script."""
-    tyro.extras.set_accent_color('bright_blue')
+    tyro.extras.set_accent_color('bright_yellow')
     mesher = tyro.cli(SurfLeafMesher)
     mesher.main()
 
