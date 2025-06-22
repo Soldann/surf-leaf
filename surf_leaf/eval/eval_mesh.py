@@ -100,17 +100,14 @@ def process_dataset(dataset_path, mesh_path, nerfstudio_scale):
     center = o3d.core.Tensor([0,0,0])
     pcd_scaled = pcd.scale(nerfstudio_scale, center)
 
-    # Filter out values that are too high   
-    # Define the distance threshold
+    # Filter out values that are too high, which would correspond with sky artifacts if the point cloud is generated from a NeRF dataset.
     threshold = 10.0  # Adjust this as needed
 
     # Compute the Euclidean distance from the origin
     distances = np.linalg.norm(pcd_scaled.point.positions.numpy(), axis=1)
 
     # Create a mask for points within the threshold
-    mask = distances < threshold
-
-    indices = np.where(mask)[0]
+    indices = np.where(distances < threshold)[0]
 
     # Apply the mask to filter points
     filtered_pcd = pcd_scaled.select_by_index(o3d.core.Tensor(indices))
@@ -139,11 +136,11 @@ def process_dataset(dataset_path, mesh_path, nerfstudio_scale):
 
 def main():
     parser = argparse.ArgumentParser(description="Process a dataset.")
-    parser.add_argument("--data", required=True, help="Path to the dataset")
-    parser.add_argument("--mesh", required=True, help="Path to the mesh to evaluate")
-    parser.add_argument("--nerfstudio-scale", type=float, default=0.04169970387999055, help="The scaling factor used in the generation of the mesh by nerfstudio. Default is 0.04169970387999055.")
+    parser.add_argument("--dataset", required=True, help="Path to the dataset")
+    parser.add_argument("--input-mesh", required=True, help="Path to the mesh to evaluate")
+    parser.add_argument("--nerfstudio-scale", type=float, default=0.04169970387999055, help="The scaling factor applied to the ground-truth mesh during evaluation. Default is 0.04169970387999055.")
     args = parser.parse_args()
-    process_dataset(args.data, args.mesh, args.nerfstudio_scale)
+    process_dataset(args.dataset, args.input_mesh, args.nerfstudio_scale)
 
 if __name__ == "__main__":
     main()
