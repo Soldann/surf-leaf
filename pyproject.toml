@@ -7,6 +7,7 @@ dependencies = [
     "nerfstudio == 1.1.3",
     "gsplat == 1.0.0",
     "pymeshlab>=2022.2.post2; platform_machine != 'arm64' and platform_machine != 'aarch64'",
+    "pcdmeshing @ git+https://github.com/cvg/pcdmeshing.git@main"
 ]
 
 [tool.setuptools.packages.find]
@@ -14,4 +15,4 @@ include = ["surf_leaf*"]
 
 [project.scripts]
 # export mesh scripts
-gs-mesh = "surf_leaf.surf_leaf_meshing:entrypoint"
+surf-leaf = "surf_leaf.surf_leaf_meshing:entrypoint"
