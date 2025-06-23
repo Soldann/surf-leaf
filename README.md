@@ -2,6 +2,8 @@
 
 **Surf-LEAF** (Surface-Level Extraction with Advancing Front Reconstruction Meshing) is a custom mesh extraction pipeline tailored for **Gaussian Splatting** reconstructions in urban environments.
 
+![Surf-LEAF Pipeline](imgs/pipeline.png)
+
 Gaussian Splatting is a recent point-based scene representation that enables real-time, high-fidelity novel view synthesis across large-scale scenes. While it excels in rendering, extracting high-quality meshes from Gaussian reconstructions remains a challenge—especially in urban scenes where sharp edges, low-contrast surfaces, and sparse regions can degrade mesh fidelity.
 
 We demonstrate improved mesh quality over existing techniques like **DN-Splatter**, achieving a **10% reduction in Chamfer distance** on the TartanAir dataset.
