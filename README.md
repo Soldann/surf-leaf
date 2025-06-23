@@ -69,7 +69,7 @@ A full table of parameters:
 | `postprocess_targetperc` | `float` | `0.6`                | Target reduction percentage for mesh simplification. |
 
 ## Example
-For our example scene we use the [TartanAir](https://theairlab.org/tartanair-dataset/) dataset, specifically the `abandoned_factory/P001` scene.
+For our example scene we use the [TartanAir](https://theairlab.org/tartanair-dataset/) dataset, specifically the `abandoned_factory/P001` scene. We use the [Tartan to Nerfstudio Converter](https://github.com/IQisMySenpai/tartanToNerfstudio) to convert the dataset to a Nerfstudio-compatible format. This includes camera poses, images, and depth images.
 
 We use [QED-Splatter](https://github.com/leggedrobotics/qed-splatter/tree/normal_testing) to train a Gaussian Splatting reconstruction of the scene.
 
