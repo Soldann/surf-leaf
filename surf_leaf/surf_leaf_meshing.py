@@ -17,7 +17,7 @@ from nerfstudio.models.splatfacto import SplatfactoModel
 from nerfstudio.utils.eval_utils import eval_setup
 from nerfstudio.utils.rich_utils import CONSOLE
 from nerfstudio.data.scene_box import OrientedBox
-from post_processing.mesh_fix import process_mesh
+from surf_leaf.post_processing.mesh_fix import process_mesh
 
 @dataclass
 class SurfLeafMesher:
