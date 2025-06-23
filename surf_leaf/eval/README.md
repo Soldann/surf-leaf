@@ -6,12 +6,12 @@ This tool will compare a given input mesh to the ground-truth in a Nerfstudio fo
 The tool will then perform global registration using RANSAC and ICP to align the pointclouds before calculating the Chamfer Distance between them.
 
 
-### Installation
+## Installation
 ```
 pip install open3d
 ```
 
-### Usage
+## Usage
 ```
 python eval_mesh.py --input-mesh <path_to_mesh> --dataset <path_to_nerfstudio_dataset> --scaling_factor <scaling_factor>
 ```
@@ -21,3 +21,6 @@ For example:
 ```
 python eval_mesh.py --input-mesh output_mesh.ply --dataset /data/tartanair/abandoned_factory/P001 --scaling_factor 0.04
 ``` 
+
+## References
+The implementation of pointcloud alignment was modified from https://www.open3d.org/docs/latest/tutorial/Advanced/global_registration.html.
