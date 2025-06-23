@@ -23,11 +23,13 @@ from surf_leaf.post_processing.mesh_fix import process_mesh
 class SurfLeafMesher:
     """SurfLEAF: Mesh Extraction using SuGaR Surface Level Extraction with Advancing Front Reconstruction"""
 
+    # Input Output parameters
     load_config: Path
     """Path to the trained config YAML file."""
     output_dir: Path = Path("./mesh_exports/")
     """Path to the output directory."""
 
+    # Sampling parameters
     total_points: int = 2_000_000
     """Total target surface samples"""
     use_masks: bool = False
@@ -37,7 +39,9 @@ class SurfLeafMesher:
     return_normal: Literal[
         "analytical", "closest_gaussian", "average"
     ] = "closest_gaussian"
+    """Method to return normals for the surface points."""
 
+    # Cropbox parameters
     cropbox_pos: Optional[Tuple[float, float, float]] = None
     """Position of the cropbox center"""
     cropbox_rpy: Optional[Tuple[float, float, float]] = None
@@ -45,6 +49,7 @@ class SurfLeafMesher:
     cropbox_scale: Optional[Tuple[float, float, float]] = None
     """Scale of the cropbox"""
 
+    # Meshing parameters
     voxel_size: float = 0.4
     """Voxel size for meshing"""
     margin_seam: float = 0.04
@@ -225,20 +230,20 @@ class SurfLeafMesher:
                 CONSOLE.print("Saving mesh to ", raw_mesh_path)
                 o3d.io.write_triangle_mesh(raw_mesh_path, mesh_raw)
 
-                # clean_mesh_path = str(
-                #     self.output_dir
-                #     / f"clean_mesh_{surface_level}_{self.return_normal}.ply"
-                # )
-                # CONSOLE.print("Applying Post-Processing to Mesh... this may take a while.")
-                # cleaned_meshset = process_mesh(
-                #     mesh_raw,
-                #     alpha_fraction=self.postprocess_alpha_fraction,
-                #     stepsmoothnum=self.postprocess_stepsmoothnum,
-                #     targetperc=self.postprocess_targetperc,
-                #     print_progress=False,
-                # )
-                # CONSOLE.print("Saving cleaned mesh to ", clean_mesh_path)
-                # cleaned_meshset.save_current_mesh(clean_mesh_path)
+                clean_mesh_path = str(
+                    self.output_dir
+                    / f"clean_mesh_{surface_level}_{self.return_normal}.ply"
+                )
+                CONSOLE.print("Applying Post-Processing to Mesh... this may take a while.")
+                cleaned_meshset = process_mesh(
+                    mesh_raw,
+                    alpha_fraction=self.postprocess_alpha_fraction,
+                    stepsmoothnum=self.postprocess_stepsmoothnum,
+                    targetperc=self.postprocess_targetperc,
+                    print_progress=False,
+                )
+                CONSOLE.print("Saving cleaned mesh to ", clean_mesh_path)
+                cleaned_meshset.save_current_mesh(clean_mesh_path)
 
 
 def entrypoint():
