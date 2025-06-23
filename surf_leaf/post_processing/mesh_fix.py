@@ -23,7 +23,13 @@ def process_mesh(o3d_input_mesh, alpha_fraction=0.001, stepsmoothnum=1, targetpe
     # Convert Open3D mesh to PyMeshLab mesh
     vertices = np.asarray(o3d_input_mesh.vertices).astype(np.float64)
     faces = np.asarray(o3d_input_mesh.triangles).astype(np.int32)
-    input_mesh = pymeshlab.Mesh(vertex_matrix=vertices, face_matrix=faces)
+    if o3d_input_mesh.has_vertex_colors():
+        vertex_colours = np.asarray(o3d_input_mesh.vertex_colors, dtype=np.float64)
+    else:
+        vertex_colours = np.zeros((vertices.shape[0], 3))
+    vertex_colours = np.hstack((vertex_colours, np.ones((vertex_colours.shape[0], 1)))) # Expect RGBA format
+
+    input_mesh = pymeshlab.Mesh(vertex_matrix=vertices, face_matrix=faces, v_color_matrix=vertex_colours)
 
     # Create a MeshSet object
     ms = pymeshlab.MeshSet()
