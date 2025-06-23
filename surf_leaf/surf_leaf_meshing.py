@@ -56,11 +56,11 @@ class SurfLeafMesher:
 
     # Post-processing parameters
     postprocess_alpha_fraction: float = 0.001
-    """Alpha wrapping ball size fraction (default: 0.001)"""
+    """Alpha wrapping ball size fraction"""
     postprocess_stepsmoothnum: int = 1
-    """HC Laplacian smoothing steps (default: 1)"""
+    """HC Laplacian smoothing steps"""
     postprocess_targetperc: float = 0.6
-    """Target percentage reduction for mesh simplification (default: 0.6)"""
+    """Target percentage reduction for mesh simplification"""
 
 
     def main(self):
@@ -136,7 +136,6 @@ class SurfLeafMesher:
                         img_surface_points = img_surface_points[inside_crop]
                         img_surface_colors = img_surface_colors[inside_crop]
                         img_surface_normals = img_surface_normals[inside_crop]
-                        img_surface_sdf = img_surface_sdf[inside_crop]
 
                     surface_levels_outputs[surface_level]["points"] = torch.cat(
                         [
@@ -226,20 +225,20 @@ class SurfLeafMesher:
                 CONSOLE.print("Saving mesh to ", raw_mesh_path)
                 o3d.io.write_triangle_mesh(raw_mesh_path, mesh_raw)
 
-                clean_mesh_path = str(
-                    self.output_dir
-                    / f"clean_mesh_{surface_level}_{self.return_normal}.ply"
-                )
-                CONSOLE.print("Applying Post-Processing to Mesh... this may take a while.")
-                cleaned_meshset = process_mesh(
-                    mesh_raw, 
-                    alpha_fraction=self.postprocess_alpha_fraction,
-                    stepsmoothnum=self.postprocess_stepsmoothnum,
-                    targetperc=self.postprocess_targetperc,
-                    print_progress=False,
-                )
-                CONSOLE.print("Saving cleaned mesh to ", clean_mesh_path)
-                cleaned_meshset.save_current_mesh(clean_mesh_path)
+                # clean_mesh_path = str(
+                #     self.output_dir
+                #     / f"clean_mesh_{surface_level}_{self.return_normal}.ply"
+                # )
+                # CONSOLE.print("Applying Post-Processing to Mesh... this may take a while.")
+                # cleaned_meshset = process_mesh(
+                #     mesh_raw,
+                #     alpha_fraction=self.postprocess_alpha_fraction,
+                #     stepsmoothnum=self.postprocess_stepsmoothnum,
+                #     targetperc=self.postprocess_targetperc,
+                #     print_progress=False,
+                # )
+                # CONSOLE.print("Saving cleaned mesh to ", clean_mesh_path)
+                # cleaned_meshset.save_current_mesh(clean_mesh_path)
 
 
 def entrypoint():
