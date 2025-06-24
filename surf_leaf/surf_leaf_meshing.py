@@ -90,9 +90,9 @@ class SurfLeafMesher:
                 self.cropbox_scale = (1.0, 1.0, 1.0)
 
             cropbox = OrientedBox.from_params(
-                pos=(0.0, 0.0, 0.0),
-                rpy=(0.0, 0.0, 0.0),
-                scale=(2.0, 2.0, 2.0),
+                pos=self.cropbox_pos,
+                rpy=self.cropbox_rpy,
+                scale=self.cropbox_scale,
             )
 
         with torch.no_grad():
