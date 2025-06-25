@@ -78,7 +78,7 @@ After training, we can extract the mesh using Surf-LEAF:
 
 ```sh
 surf-leaf --load_config /outputs/qed-splatter/2025-06-23_022015/abandoned_factory/P001/config.yml \
-          --cropbox_scale 2.0, 2.0, 2.0
+          --cropbox_scale 2.0 2.0 2.0
 ```
 
 This will extract the mesh from the Gaussian Splatting reconstruction, using a cropbox scale of 2.0 in all dimensions.
