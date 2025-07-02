@@ -1,6 +1,6 @@
 # Surf-LEAF
 
-### | [Project Paper](3D_Vision_Final_Report.pdf) |
+### | [Project Report](3D_Vision_Final_Report.pdf) |
 
 **Surf-LEAF** (Surface-Level Extraction with Advancing Front Reconstruction Meshing) is a custom mesh extraction pipeline tailored for **Gaussian Splatting** reconstructions in urban environments.
 
