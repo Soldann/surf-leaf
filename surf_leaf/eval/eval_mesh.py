@@ -64,7 +64,7 @@ def load_transforms_json(path):
         pointcloud = pointcloud.voxel_down_sample(voxel_size=0.05)  # Adjust voxel size as needed
         return pointcloud
 
-def process_dataset(dataset_path, mesh_path, nerfstudio_scale):
+def process_dataset(dataset_path, mesh_path, nerfstudio_scale, debug=False):
     """Reads and processes the dataset."""
     
     if os.path.exists(os.path.join(dataset_path, "gt_pointcloud.ply")):
@@ -123,8 +123,9 @@ def process_dataset(dataset_path, mesh_path, nerfstudio_scale):
     refined_result = pointcloud_alignment.refine_registration(
         source_down, target_down, source_fpfh, target_fpfh, voxel_size=0.05, ransac_result=ransac_result)
 
-    # print("Drawing result")
-    # pointcloud_alignment.draw_registration_result(mesh_alignment_pcd, filtered_pcd, refined_result.transformation)
+    if debug:
+        print("Drawing result")
+        pointcloud_alignment.draw_registration_result(mesh_alignment_pcd, filtered_pcd, refined_result.transformation)
 
     aligned_mesh_pcd = mesh_alignment_pcd.transform(refined_result.transformation)
     metric_params = MetricParameters(fscore_radius=[0.009999999776482582])
@@ -179,8 +180,9 @@ def main():
     parser.add_argument("--dataset", required=True, help="Path to the dataset")
     parser.add_argument("--input-mesh", required=True, help="Path to the mesh to evaluate")
     parser.add_argument("--nerfstudio-scale", type=float, default=0.04169970387999055, help="The scaling factor applied to the ground-truth mesh during evaluation. Default is 0.04169970387999055.")
+    parser.add_argument("--debug", action="store_true", help="Show pointcloud registration results for debugging purposes")
     args = parser.parse_args()
-    process_dataset(args.dataset, args.input_mesh, args.nerfstudio_scale)
+    process_dataset(args.dataset, args.input_mesh, args.nerfstudio_scale, args.debug)
 
 if __name__ == "__main__":
     main()
