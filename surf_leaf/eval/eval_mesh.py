@@ -123,16 +123,56 @@ def process_dataset(dataset_path, mesh_path, nerfstudio_scale):
     refined_result = pointcloud_alignment.refine_registration(
         source_down, target_down, source_fpfh, target_fpfh, voxel_size=0.05, ransac_result=ransac_result)
 
-    print("Drawing result")
-    pointcloud_alignment.draw_registration_result(mesh_alignment_pcd, filtered_pcd, refined_result.transformation)
+    # print("Drawing result")
+    # pointcloud_alignment.draw_registration_result(mesh_alignment_pcd, filtered_pcd, refined_result.transformation)
 
     aligned_mesh_pcd = mesh_alignment_pcd.transform(refined_result.transformation)
-    metric_params = MetricParameters()
+    metric_params = MetricParameters(fscore_radius=[0.009999999776482582])
     metrics = aligned_mesh_pcd.compute_metrics(
-        filtered_pcd, [Metric.ChamferDistance],
+        filtered_pcd, [Metric.ChamferDistance, Metric.FScore],
     metric_params)
 
+    num = compute_metrics(aligned_mesh_pcd, filtered_pcd)
+
     print("Chamfer Distance ", metrics)
+    print("And then ", num)
+
+def compute_metrics(pointcloud1: o3d.t.geometry.PointCloud, pointcloud2: o3d.t.geometry.PointCloud, radius=0.009999999776482582):
+    points1 = pointcloud1.point.positions
+    points2 = pointcloud2.point.positions
+
+    tree1 = o3d.core.nns.NearestNeighborSearch(points1)
+    tree2 = o3d.core.nns.NearestNeighborSearch(points2)
+
+    if not tree2.knn_index():
+        print("Building knn index failed")
+    if not tree1.knn_index():
+        print("Building knn index failed")
+
+    indices12, squared_distances12 = tree2.knn_search(points1, knn=1)
+    indices21, squared_distances21 = tree1.knn_search(points2, knn=1)
+
+    distances12 = squared_distances12.sqrt()
+    distances21 = squared_distances21.sqrt()
+
+    chamfer_distance = distances21.reshape(-1).mean(-1).item() + distances12.reshape(-1).mean(-1).item()
+    
+    precision = (distances12.reshape(-1) < radius).to(o3d.core.Dtype.Float32) / 255.0
+    precision = precision.sum().item()
+    print("Precision: ", precision)
+    precision *= 100.0/len(distances12.reshape(-1))
+    print("Precision after scaling: ", precision)
+    recall = (distances21.reshape(-1) < radius).to(o3d.core.Dtype.Float32) / 255.0
+    recall = recall.sum().item()
+    print("Recall: ", recall)
+    recall *= 100.0/len(distances21.reshape(-1))
+    print("Recall after scaling: ", recall)
+
+    fscore = 0.0
+    if (precision + recall) > 0:
+        fscore = 2 * precision * recall / (precision + recall)
+    return [chamfer_distance, fscore]
+
 
 def main():
     parser = argparse.ArgumentParser(description="Process a dataset.")
