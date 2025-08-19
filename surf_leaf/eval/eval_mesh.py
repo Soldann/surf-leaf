@@ -128,17 +128,14 @@ def process_dataset(dataset_path, mesh_path, nerfstudio_scale, debug=False):
         pointcloud_alignment.draw_registration_result(mesh_alignment_pcd, filtered_pcd, refined_result.transformation)
 
     aligned_mesh_pcd = mesh_alignment_pcd.transform(refined_result.transformation)
-    metric_params = MetricParameters(fscore_radius=[0.009999999776482582])
-    metrics = aligned_mesh_pcd.compute_metrics(
-        filtered_pcd, [Metric.ChamferDistance, Metric.FScore],
-    metric_params)
 
-    num = compute_metrics(aligned_mesh_pcd, filtered_pcd)
+    metrics = compute_metrics(aligned_mesh_pcd, filtered_pcd)
 
-    print("Chamfer Distance ", metrics)
-    print("And then ", num)
+    print(metrics)
 
-def compute_metrics(pointcloud1: o3d.t.geometry.PointCloud, pointcloud2: o3d.t.geometry.PointCloud, radius=0.009999999776482582):
+def compute_metrics(pointcloud1: o3d.t.geometry.PointCloud, pointcloud2: o3d.t.geometry.PointCloud, f1_radius=0.009999999776482582):
+    metrics = {}
+
     points1 = pointcloud1.point.positions
     points2 = pointcloud2.point.positions
 
@@ -156,23 +153,26 @@ def compute_metrics(pointcloud1: o3d.t.geometry.PointCloud, pointcloud2: o3d.t.g
     distances12 = squared_distances12.sqrt()
     distances21 = squared_distances21.sqrt()
 
-    chamfer_distance = distances21.reshape(-1).mean(-1).item() + distances12.reshape(-1).mean(-1).item()
+    metrics["Chamfer Distance 1->2"] = distances12.reshape(-1).mean(-1).item()
+    metrics["Chamfer Distance 2->1"] = distances21.reshape(-1).mean(-1).item()
+    metrics["O3D Chamfer Distance (Sum)"] = metrics["Chamfer Distance 1->2"] + metrics["Chamfer Distance 2->1"]
+    metrics["Chamfer Distance (Mean)"] = (metrics["Chamfer Distance 1->2"]*len(distances12.reshape(-1)) + metrics["Chamfer Distance 2->1"]*len(distances21.reshape(-1))) / (len(distances12.reshape(-1)) + len(distances21.reshape(-1)))
     
-    precision = (distances12.reshape(-1) < radius).to(o3d.core.Dtype.Float32) / 255.0
+    precision = (distances12.reshape(-1) < f1_radius).to(o3d.core.Dtype.Float32) / 255.0
     precision = precision.sum().item()
-    print("Precision: ", precision)
     precision *= 100.0/len(distances12.reshape(-1))
-    print("Precision after scaling: ", precision)
-    recall = (distances21.reshape(-1) < radius).to(o3d.core.Dtype.Float32) / 255.0
+    metrics["Completeness"] = precision
+    recall = (distances21.reshape(-1) < f1_radius).to(o3d.core.Dtype.Float32) / 255.0
     recall = recall.sum().item()
-    print("Recall: ", recall)
     recall *= 100.0/len(distances21.reshape(-1))
-    print("Recall after scaling: ", recall)
+    metrics["Accuracy"] = recall
 
     fscore = 0.0
     if (precision + recall) > 0:
         fscore = 2 * precision * recall / (precision + recall)
-    return [chamfer_distance, fscore]
+    metrics["F1-Score"] = fscore
+
+    return metrics
 
 
 def main():
