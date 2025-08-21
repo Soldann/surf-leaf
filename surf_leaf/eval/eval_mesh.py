@@ -6,6 +6,23 @@ import open3d as o3d
 from open3d.t.geometry import Metric, MetricParameters
 import utils.pointcloud_alignment as pointcloud_alignment
 
+def tree_merge_pointclouds(pointclouds, voxel_size=0.03, max_points=2000000):
+    """Merge a list of pointclouds using tree merge for log(n) runtime."""
+    import math
+    merged = pointclouds
+    while len(merged) > 1:
+        next_level = []
+        for i in range(0, len(merged), 2):
+            if i + 1 < len(merged):
+                pc = merged[i] + merged[i + 1]
+                if pc.point.positions.shape[0] > max_points:
+                    pc = pc.voxel_down_sample(voxel_size=voxel_size)
+                next_level.append(pc)
+            else:
+                next_level.append(merged[i])
+        merged = next_level
+    return merged[0]
+
 def load_transforms_json(path):
     test_cam_infos = []
     train_cam_infos = []
@@ -17,7 +34,7 @@ def load_transforms_json(path):
         frames = contents["frames"]
 
         # Convert to set for faster evaluation
-        pointcloud = o3d.t.geometry.PointCloud()
+        pointclouds = []
 
         for idx, frame in enumerate(frames):
             cam_name = os.path.join(path, frame["file_path"])
@@ -59,10 +76,16 @@ def load_transforms_json(path):
                 stride=1
             )
 
-            pointcloud += pointcloud_from_depth
-            
-        pointcloud = pointcloud.voxel_down_sample(voxel_size=0.05)  # Adjust voxel size as needed
-        return pointcloud
+            pointclouds.append(pointcloud_from_depth)
+
+        if pointclouds:
+            print("Merging pointclouds...")
+            pointcloud = tree_merge_pointclouds(pointclouds, voxel_size=0.03, max_points=2000000)
+            # Final downsample for consistency
+            pointcloud = pointcloud.voxel_down_sample(voxel_size=0.05) # Adjust voxel size as needed
+            return pointcloud
+        else:
+            raise RuntimeError("No valid point clouds could be generated from the dataset.")
 
 def process_dataset(dataset_path, mesh_path, nerfstudio_scale, debug=False):
     """Reads and processes the dataset."""
