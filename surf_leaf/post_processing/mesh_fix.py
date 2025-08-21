@@ -6,19 +6,9 @@ import numpy as np
 import time
 
 
-def process_mesh(o3d_input_mesh, alpha_fraction=0.001, stepsmoothnum=1, targetperc=0.6, print_progress=True):
-    """
-    Fixes a mesh by removing isolated pieces, smoothing, applying alpha wrapping,
-    and simplifying the mesh.
-    
-    Parameters:
-    o3d_input_mesh (open3d.geometry.TriangleMesh): Open3D mesh to be processed.
-    alpha_fraction (float): The size of the ball (fraction) for alpha wrapping. 
-    stepsmoothnum (int): The number of times that the HC Laplacian smoothing algorithm is iterated.
-    targetperc (float, 0...1): Target percentage reduction for mesh simplification.
-    Returns:
-    ms (pymeshlab.MeshSet): The processed MeshSet object containing the fixed mesh.
-    """
+def process_mesh(o3d_input_mesh, alpha_fraction=0.001, stepsmoothnum=1, targetperc=0.6, print_progress=True, output_dir="processed_steps"):
+    import os
+    os.makedirs(output_dir, exist_ok=True)
 
     # Convert Open3D mesh to PyMeshLab mesh
     vertices = np.asarray(o3d_input_mesh.vertices).astype(np.float64)
@@ -27,55 +17,52 @@ def process_mesh(o3d_input_mesh, alpha_fraction=0.001, stepsmoothnum=1, targetpe
         vertex_colours = np.asarray(o3d_input_mesh.vertex_colors, dtype=np.float64)
     else:
         vertex_colours = np.zeros((vertices.shape[0], 3))
-    vertex_colours = np.hstack((vertex_colours, np.ones((vertex_colours.shape[0], 1)))) # Expect RGBA format
+    vertex_colours = np.hstack((vertex_colours, np.ones((vertex_colours.shape[0], 1))))  # RGBA
 
     input_mesh = pymeshlab.Mesh(vertex_matrix=vertices, face_matrix=faces, v_color_matrix=vertex_colours)
-
-    # Create a MeshSet object
     ms = pymeshlab.MeshSet()
-
-    # load the input mesh
-    start_time = time.time()
     ms.add_mesh(input_mesh)
     if print_progress:
         print(f"Input mesh loaded. Face count: {ms.current_mesh().face_number()}")
 
-    # remove isolated pieces
-    start_time = time.time()
+    ms.save_current_mesh(os.path.join(output_dir, "step0_input.obj"))
+
+    # Step 1: Remove isolated pieces
     ms.meshing_remove_connected_component_by_diameter()
+    ms.save_current_mesh(os.path.join(output_dir, "step1_removed_isolated.obj"))
     if print_progress:
-        print(f"✅ Removing isolated pieces. Elapsed time: {time.time() - start_time:.2f} seconds.")
+        print("✅ Removed isolated pieces.")
 
-    # smooth the output mesh
-    start_time = time.time()
+    # Step 2: Smoothing
     ms.apply_coord_two_steps_smoothing(normalthr=20.0, stepnormalnum=6, stepfitnum=6)
+    ms.save_current_mesh(os.path.join(output_dir, "step2_smoothed.obj"))
     if print_progress:
-        print(f"✅ Smoothing mesh. Elapsed time: {time.time() - start_time:.2f} seconds.")
+        print("✅ Smoothed mesh.")
 
-    # create a new mesh object using alpha wrapping
-    start_time = time.time()
+    # Step 3: Alpha wrapping
     ms.generate_alpha_wrap(alpha_fraction=alpha_fraction, offset_fraction=0.000200)
-    if print_progress:
-        print(f"✅ Alpha wrapping. Elapsed time: {time.time() - start_time:.2f} seconds.")
-
-    # set the second mesh (alpha wrapping mesh) as current mesh
     ms.set_current_mesh(1)
+    ms.save_current_mesh(os.path.join(output_dir, "step3_alpha_wrap.obj"))
+    if print_progress:
+        print("✅ Alpha wrapping applied.")
 
-    # HC Laplacian smoothing
-    start_time = time.time()
+    # Step 4: HC Laplacian smoothing
     for _ in range(stepsmoothnum):
         ms.apply_coord_hc_laplacian_smoothing()
+    ms.save_current_mesh(os.path.join(output_dir, "step4_hc_smoothing.obj"))
     if print_progress:
-        print(f"✅ HC Laplacian smoothing. Elapsed time: {time.time() - start_time:.2f} seconds.")
+        print("✅ HC Laplacian smoothing completed.")
 
-    # simplify the mesh
-    start_time = time.time()
-    ms.meshing_decimation_quadric_edge_collapse(targetperc=targetperc, preservetopology=False, planarquadric=True)
+    # Step 5: Simplify mesh
+    ms.meshing_decimation_quadric_edge_collapse(
+        targetperc=targetperc,
+        preservetopology=False,
+        planarquadric=True
+    )
+    ms.save_current_mesh(os.path.join(output_dir, "step5_simplified.obj"))
     if print_progress:
-        print(f"✅ Mesh simplification. Elapsed time: {time.time() - start_time:.2f} seconds.")
+        print("✅ Mesh simplification complete.")
 
-    # save the fixed mesh to outfile
-    start_time = time.time()
     return ms
 
 
