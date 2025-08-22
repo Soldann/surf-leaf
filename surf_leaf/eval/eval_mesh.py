@@ -152,7 +152,7 @@ def process_dataset(dataset_path, mesh_path, nerfstudio_scale, debug=False):
 
     aligned_mesh_pcd = mesh_alignment_pcd.transform(refined_result.transformation)
 
-    metrics = compute_metrics(aligned_mesh_pcd, filtered_pcd)
+    metrics = compute_metrics(filtered_pcd, aligned_mesh_pcd)
 
     print(metrics)
 
