@@ -60,20 +60,29 @@ def load_transforms_json(path):
 
             invdepthmap = np.ascontiguousarray(invdepthmap)
 
+            # Convert depth map to Open3D tensor image
+            depth_tensor = o3d.core.Tensor(invdepthmap, dtype=o3d.core.Dtype.Float32)
+            depth_image = o3d.t.geometry.Image(depth_tensor)
+
+            # Camera intrinsics as Open3D tensor
+            intrinsic = np.array([
+                [contents["fl_x"], 0, contents["cx"]],
+                [0, contents["fl_y"], contents["cy"]],
+                [0, 0, 1]
+            ], dtype=np.float32)
+            intrinsic_tensor = o3d.core.Tensor(intrinsic)
+
+            # Extrinsic matrix as Open3D tensor
+            extrinsic_tensor = o3d.core.Tensor(w2c, dtype=o3d.core.Dtype.Float32)
+
             pointcloud_from_depth = o3d.t.geometry.PointCloud.create_from_depth_image(
-                o3d.geometry.Image(invdepthmap),
-                o3d.camera.PinholeCameraIntrinsic(
-                    width=contents["w"],
-                    height=contents["h"],
-                    fx=contents["fl_x"],
-                    fy=contents["fl_y"],
-                    cx=contents["cx"],
-                    cy=contents["cy"]
-                ),
-                extrinsic=w2c,  # World to camera transform
-                depth_scale=1.0,  # Adjust as necessary
-                depth_trunc=100.0,  # Adjust as necessary
-                stride=1
+                depth_image,
+                intrinsic_tensor,
+                extrinsic_tensor,
+                depth_scale=1.0,
+                depth_max=100.0,
+                stride=1,
+                with_normals=False
             )
 
             pointclouds.append(pointcloud_from_depth)
