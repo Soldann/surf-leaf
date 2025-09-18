@@ -1,10 +1,15 @@
-import argparse
 import os
 import json
 import numpy as np
 import open3d as o3d
 from open3d.t.geometry import Metric, MetricParameters
 import utils.pointcloud_alignment as pointcloud_alignment
+from pathlib import Path
+import tyro
+import glob
+import yaml
+from typing import List
+from dataclasses import dataclass
 
 def tree_merge_pointclouds(pointclouds, voxel_size=0.03, max_points=2000000):
     """Merge a list of pointclouds using tree merge for log(n) runtime."""
@@ -96,9 +101,11 @@ def load_transforms_json(path):
         else:
             raise RuntimeError("No valid point clouds could be generated from the dataset.")
 
-def process_dataset(dataset_path, mesh_path, nerfstudio_scale, debug=False):
+def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float, debug: bool = False):
     """Reads and processes the dataset."""
-    
+    dataset_path = Path(dataset_path)
+    mesh_path = Path(mesh_path)
+
     if os.path.exists(os.path.join(dataset_path, "gt_pointcloud.ply")):
         print("Found gt_pointcloud.ply file")
         pcd = o3d.t.io.read_point_cloud(os.path.join(dataset_path, "gt_pointcloud.ply"))
@@ -122,12 +129,13 @@ def process_dataset(dataset_path, mesh_path, nerfstudio_scale, debug=False):
     # pcd.point.positions = (pcd.point.positions - pcd.point.positions.min()) / (pcd.point.positions.max() - pcd.point.positions.min())
 
     # Load mesh and convert to tensor-based TriangleMesh
-    mesh = o3d.t.io.read_triangle_mesh(mesh_path)
-    # Normalize mesh vertices to the range [0, 1]
-    mesh.vertex.positions = mesh.vertex.positions.to(o3d.core.float32)  # Convert to Float32
+    mesh = o3d.t.io.read_triangle_mesh(str(mesh_path))
+    mesh.vertex.positions = mesh.vertex.positions.to(o3d.core.float32)
     print("Number of vertices in mesh: ", mesh.vertex.positions.shape[0])
-    # print("Normalizing mesh vertices to the range [0, 1], original max and min are {} and {}".format(mesh.vertex.positions.max(), mesh.vertex.positions.min()))
-    # mesh.vertex.positions = (mesh.vertex.positions - mesh.vertex.positions.min()) / (mesh.vertex.positions.max() - mesh.vertex.positions.min())
+
+    # Mesh statistics
+    vertex_count = mesh.vertex.positions.shape[0]
+    face_count = mesh.triangle.indices.shape[0] if hasattr(mesh, "triangle") and hasattr(mesh.triangle, "indices") else 0
 
     center = o3d.core.Tensor([0,0,0])
     pcd_scaled = pcd.scale(nerfstudio_scale, center)
@@ -163,7 +171,17 @@ def process_dataset(dataset_path, mesh_path, nerfstudio_scale, debug=False):
 
     metrics = compute_metrics(filtered_pcd, aligned_mesh_pcd)
 
+    # Add mesh statistics
+    metrics["Mesh Vertex Count"] = vertex_count
+    metrics["Mesh Face Count"] = face_count
+
     print(metrics)
+
+    # Save metrics as JSON in mesh parent directory
+    stats_path = mesh_path.parent / f"{mesh_path.stem}_stats.json"
+    with open(stats_path, "w") as f:
+        json.dump(metrics, f, indent=2)
+    print(f"Saved stats to {stats_path}")
 
 def compute_metrics(pointcloud1: o3d.t.geometry.PointCloud, pointcloud2: o3d.t.geometry.PointCloud, f1_radius=0.009999999776482582):
     metrics = {}
@@ -207,14 +225,45 @@ def compute_metrics(pointcloud1: o3d.t.geometry.PointCloud, pointcloud2: o3d.t.g
     return metrics
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Process a dataset.")
-    parser.add_argument("--dataset", required=True, help="Path to the dataset")
-    parser.add_argument("--input-mesh", required=True, help="Path to the mesh to evaluate")
-    parser.add_argument("--nerfstudio-scale", type=float, default=0.04169970387999055, help="The scaling factor applied to the ground-truth mesh during evaluation. Default is 0.04169970387999055.")
-    parser.add_argument("--debug", action="store_true", help="Show pointcloud registration results for debugging purposes")
-    args = parser.parse_args()
-    process_dataset(args.dataset, args.input_mesh, args.nerfstudio_scale, args.debug)
+def get_dataset_path_from_config(config_path: Path) -> Path:
+    with open(config_path, "r") as f:
+        config = yaml.load(f, Loader=yaml.BaseLoader)
+    data_dir = Path('/'.join(config["data"]))
+    n_parents = len(config["output_dir"]) + 3
+    workspace = config_path.parent
+    for _ in range(n_parents):
+        workspace = workspace.parent
+    dataset_path = workspace / data_dir
+    return dataset_path
+
+def get_scale_from_dataparser(config_path: Path) -> float:
+    dataparser_path = config_path.parent / "dataparser_transforms.json"
+    if not dataparser_path.exists():
+        raise FileNotFoundError(f"{dataparser_path} not found.")
+    with open(dataparser_path, "r") as f:
+        dataparser = json.load(f)
+    return float(dataparser["scale"])
+
+def main(args):
+    config_path = Path(args.config)
+    dataset_path = get_dataset_path_from_config(config_path)
+    nerfstudio_scale = get_scale_from_dataparser(config_path)
+    mesh_paths = []
+    for pattern in args.input_mesh:
+        mesh_paths.extend([Path(p) for p in glob.glob(str(pattern), recursive=True)])
+    if not mesh_paths:
+        raise ValueError("No mesh files found for the given pattern(s).")
+    for mesh_path in mesh_paths:
+        print(f"Processing mesh: {mesh_path}")
+        process_dataset(dataset_path, mesh_path, nerfstudio_scale, args.debug)
+
+@dataclass
+class Args:
+    config: Path
+    input_mesh: List[Path]
+    debug: bool = False
+
 
 if __name__ == "__main__":
-    main()
+    args = tyro.cli(Args)
+    main(args)
