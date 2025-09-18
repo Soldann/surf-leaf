@@ -260,8 +260,11 @@ def main(args):
 @dataclass
 class Args:
     config: Path
+    """Path to the config.yaml file in the Nerfstudio output"""
     input_mesh: List[Path]
+    """Input mesh file or glob pattern. Supports multiple patterns."""
     debug: bool = False
+    """Enable to visualize the ICP alignment result."""
 
 
 if __name__ == "__main__":
