@@ -8,11 +8,11 @@ from pathlib import Path
 import tyro
 import glob
 import yaml
-from typing import List
+from typing import List, Optional
 from dataclasses import dataclass
 from sklearn.neighbors import NearestNeighbors
 
-def tree_merge_pointclouds(pointclouds, voxel_size=0.03, max_points=2000000):
+def tree_merge_pointclouds(pointclouds, voxel_size=0.03, max_points=2000000, remove_randomness: bool = False):
     """Merge a list of pointclouds using tree merge for log(n) runtime."""
     import math
     merged = pointclouds
@@ -22,6 +22,8 @@ def tree_merge_pointclouds(pointclouds, voxel_size=0.03, max_points=2000000):
             if i + 1 < len(merged):
                 pc = merged[i] + merged[i + 1]
                 if pc.point.positions.shape[0] > max_points:
+                    if remove_randomness:
+                        o3d.utility.random.seed(0)
                     pc = pc.voxel_down_sample(voxel_size=voxel_size)
                 next_level.append(pc)
             else:
@@ -29,7 +31,7 @@ def tree_merge_pointclouds(pointclouds, voxel_size=0.03, max_points=2000000):
         merged = next_level
     return merged[0]
 
-def load_transforms_json(path):
+def load_transforms_json(path, remove_randomness:bool = False):
     test_cam_infos = []
     train_cam_infos = []
 
@@ -95,14 +97,16 @@ def load_transforms_json(path):
 
         if pointclouds:
             print("Merging pointclouds...")
-            pointcloud = tree_merge_pointclouds(pointclouds, voxel_size=0.03, max_points=2000000)
+            pointcloud = tree_merge_pointclouds(pointclouds, voxel_size=0.03, max_points=2000000, remove_randomness=remove_randomness)
             # Final downsample for consistency
+            if remove_randomness:
+                o3d.utility.random.seed(0)
             pointcloud = pointcloud.voxel_down_sample(voxel_size=0.05) # Adjust voxel size as needed
             return pointcloud
         else:
             raise RuntimeError("No valid point clouds could be generated from the dataset.")
 
-def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float, debug: bool = False, ransac_transform = None):
+def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float, debug: bool = False, remove_randomness: bool = False, ransac_transform: Optional[np.ndarray] = None):
     """Reads and processes the dataset."""
     dataset_path = Path(dataset_path)
     mesh_path = Path(mesh_path)
@@ -117,7 +121,7 @@ def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float
         print("No gt_pointcloud.ply file found, generating...")
         if os.path.exists(os.path.join(dataset_path, "transforms.json")):
             print("Found transforms.json file, assuming Nerfstudio data set!")
-            pcd = load_transforms_json(dataset_path)
+            pcd = load_transforms_json(dataset_path, remove_randomness=remove_randomness)
             print(f"Loaded point cloud with {pcd.point.positions.shape[0]} points.")
             # save the point cloud to a file as ply
             o3d.t.io.write_point_cloud(os.path.join(dataset_path, "gt_pointcloud.ply"), pcd)
@@ -152,6 +156,8 @@ def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float
 
     # Apply the mask to filter points
     filtered_pcd = pcd_scaled.select_by_index(o3d.core.Tensor(indices))
+    if remove_randomness:
+        o3d.utility.random.seed(0)
     mesh_alignment_pcd = mesh.sample_points_uniformly(number_of_points=10000)  # Sample points from the mesh
 
     if ransac_transform is None:
@@ -264,7 +270,7 @@ def main(args):
     for mesh_path in mesh_paths:
         print(f"Processing mesh: {mesh_path}")
         if args.shared_alignment_transform:
-            global_ransac_transform = process_dataset(dataset_path, mesh_path, nerfstudio_scale, args.debug, ransac_transform=global_ransac_transform)
+            global_ransac_transform = process_dataset(dataset_path, mesh_path, nerfstudio_scale, args.debug, remove_randomness=args.shared_alignment_transform, ransac_transform=global_ransac_transform)
         else:
             process_dataset(dataset_path, mesh_path, nerfstudio_scale, args.debug)
 
@@ -277,7 +283,7 @@ class Args:
     debug: bool = False
     """Enable to visualize the ICP alignment result."""
     shared_alignment_transform: bool = False
-    """If true, use the same alignment transform for all meshes. Otherwise, compute a separate transform for each mesh."""
+    """If true, use the same alignment transform for all meshes and remove all other randomness. Otherwise, compute a separate transform for each mesh."""
 
 if __name__ == "__main__":
     args = tyro.cli(Args)
