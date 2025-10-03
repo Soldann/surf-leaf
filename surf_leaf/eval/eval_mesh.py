@@ -10,6 +10,7 @@ import glob
 import yaml
 from typing import List
 from dataclasses import dataclass
+from sklearn.neighbors import NearestNeighbors
 
 def tree_merge_pointclouds(pointclouds, voxel_size=0.03, max_points=2000000):
     """Merge a list of pointclouds using tree merge for log(n) runtime."""
@@ -195,19 +196,19 @@ def compute_metrics(pointcloud1: o3d.t.geometry.PointCloud, pointcloud2: o3d.t.g
     points1 = pointcloud1.point.positions
     points2 = pointcloud2.point.positions
 
-    tree1 = o3d.core.nns.NearestNeighborSearch(points1)
-    tree2 = o3d.core.nns.NearestNeighborSearch(points2)
+    # Convert Open3D tensors to numpy
+    pts1_np = points1.numpy()
+    pts2_np = points2.numpy()
 
-    if not tree2.knn_index():
-        print("Building knn index failed")
-    if not tree1.knn_index():
-        print("Building knn index failed")
+    # Fit sklearn nearest-neighbors and query
+    nn2 = NearestNeighbors(n_neighbors=1, algorithm="brute").fit(pts2_np)
+    dists12, inds12 = nn2.kneighbors(pts1_np, return_distance=True)
 
-    indices12, squared_distances12 = tree2.knn_search(points1, knn=1)
-    indices21, squared_distances21 = tree1.knn_search(points2, knn=1)
+    nn1 = NearestNeighbors(n_neighbors=1, algorithm="brute").fit(pts1_np)
+    dists21, inds21 = nn1.kneighbors(pts2_np, return_distance=True)
 
-    distances12 = squared_distances12.sqrt()
-    distances21 = squared_distances21.sqrt()
+    distances12 = o3d.core.Tensor(dists12.astype(np.float32), dtype=o3d.core.Dtype.Float32)
+    distances21 = o3d.core.Tensor(dists21.astype(np.float32), dtype=o3d.core.Dtype.Float32)
 
     metrics["Chamfer Distance 1->2"] = distances12.reshape(-1).mean(-1).item()
     metrics["Chamfer Distance 2->1"] = distances21.reshape(-1).mean(-1).item()
