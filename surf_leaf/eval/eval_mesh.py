@@ -101,7 +101,7 @@ def load_transforms_json(path):
         else:
             raise RuntimeError("No valid point clouds could be generated from the dataset.")
 
-def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float, debug: bool = False):
+def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float, debug: bool = False, ransac_transform = None):
     """Reads and processes the dataset."""
     dataset_path = Path(dataset_path)
     mesh_path = Path(mesh_path)
@@ -153,21 +153,25 @@ def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float
     filtered_pcd = pcd_scaled.select_by_index(o3d.core.Tensor(indices))
     mesh_alignment_pcd = mesh.sample_points_uniformly(number_of_points=10000)  # Sample points from the mesh
 
-    # Align the point cloud with the mesh using ICP
-    target_down, target_fpfh = pointcloud_alignment.preprocess_point_cloud(filtered_pcd, voxel_size=0.05)
-    source_down, source_fpfh = pointcloud_alignment.preprocess_point_cloud(mesh_alignment_pcd, voxel_size=0.05)
+    if ransac_transform is None:
+        print("Computing alignment transform using ICP...")
+        # Align the point cloud with the mesh using ICP
+        target_down, target_fpfh = pointcloud_alignment.preprocess_point_cloud(filtered_pcd, voxel_size=0.05)
+        source_down, source_fpfh = pointcloud_alignment.preprocess_point_cloud(mesh_alignment_pcd, voxel_size=0.05)
 
-    # pcd_down = filtered_pcd.voxel_down_sample(voxel_size=0.05)
-    ransac_result = pointcloud_alignment.execute_global_registration(
-        source_down, target_down, source_fpfh, target_fpfh, voxel_size=0.05)
-    refined_result = pointcloud_alignment.refine_registration(
-        source_down, target_down, source_fpfh, target_fpfh, voxel_size=0.05, ransac_result=ransac_result)
+        # pcd_down = filtered_pcd.voxel_down_sample(voxel_size=0.05)
+        ransac_result = pointcloud_alignment.execute_global_registration(
+            source_down, target_down, source_fpfh, target_fpfh, voxel_size=0.05)
+        refined_result = pointcloud_alignment.refine_registration(
+            source_down, target_down, source_fpfh, target_fpfh, voxel_size=0.05, ransac_result=ransac_result)
 
-    if debug:
-        print("Drawing result")
-        pointcloud_alignment.draw_registration_result(mesh_alignment_pcd, filtered_pcd, refined_result.transformation)
+        if debug:
+            print("Drawing result")
+            pointcloud_alignment.draw_registration_result(mesh_alignment_pcd, filtered_pcd, refined_result.transformation)
 
-    aligned_mesh_pcd = mesh_alignment_pcd.transform(refined_result.transformation)
+        ransac_transform = refined_result.transformation
+
+    aligned_mesh_pcd = mesh_alignment_pcd.transform(ransac_transform)
 
     metrics = compute_metrics(filtered_pcd, aligned_mesh_pcd)
 
@@ -182,6 +186,8 @@ def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float
     with open(stats_path, "w") as f:
         json.dump(metrics, f, indent=2)
     print(f"Saved stats to {stats_path}")
+
+    return ransac_transform
 
 def compute_metrics(pointcloud1: o3d.t.geometry.PointCloud, pointcloud2: o3d.t.geometry.PointCloud, f1_radius=0.009999999776482582):
     metrics = {}
@@ -253,9 +259,13 @@ def main(args):
         mesh_paths.extend([Path(p) for p in glob.glob(str(pattern), recursive=True)])
     if not mesh_paths:
         raise ValueError("No mesh files found for the given pattern(s).")
+    global_ransac_transform = None
     for mesh_path in mesh_paths:
         print(f"Processing mesh: {mesh_path}")
-        process_dataset(dataset_path, mesh_path, nerfstudio_scale, args.debug)
+        if args.shared_alignment_transform:
+            global_ransac_transform = process_dataset(dataset_path, mesh_path, nerfstudio_scale, args.debug, ransac_transform=global_ransac_transform)
+        else:
+            process_dataset(dataset_path, mesh_path, nerfstudio_scale, args.debug)
 
 @dataclass
 class Args:
@@ -265,7 +275,8 @@ class Args:
     """Input mesh file or glob pattern. Supports multiple patterns."""
     debug: bool = False
     """Enable to visualize the ICP alignment result."""
-
+    shared_alignment_transform: bool = False
+    """If true, use the same alignment transform for all meshes. Otherwise, compute a separate transform for each mesh."""
 
 if __name__ == "__main__":
     args = tyro.cli(Args)
