@@ -59,6 +59,10 @@ class SurfLeafMesher:
     max_edge_length: float = 1
     """Maximum edge length for meshing"""
 
+    # Not full pipeline params
+    only_surface_extraction: bool = False
+    """If true, only perform surface extraction without meshing"""
+
     # Post-processing parameters
     postprocess_alpha_fraction: float = 0.001
     """Alpha wrapping ball size fraction"""
@@ -187,6 +191,10 @@ class SurfLeafMesher:
                     before_clean_path,
                     pcd,
                 )
+
+                if self.only_surface_extraction:
+                    CONSOLE.print("Only surface extraction requested, skipping meshing.")
+                    continue
 
                 cl, ind = pcd.remove_statistical_outlier(
                     nb_neighbors=20, std_ratio=20.0
