@@ -41,12 +41,21 @@ def process_mesh(
 
     i += 1
 
+    # Step 1: Remove isolated pieces
+    ms.meshing_remove_connected_component_by_diameter()
+    if save_intermediate:
+       ms.save_current_mesh(os.path.join(output_dir, f"step{i}_removed_isolated.ply"))
+    if print_progress:
+       print("✅ Removed isolated pieces.")
+
+    i += 1
+
     # Step 2: Smoothing
-    #ms.apply_coord_two_steps_smoothing(normalthr=20.0, stepnormalnum=6, stepfitnum=6)
-    #if save_intermediate:
-    #    ms.save_current_mesh(os.path.join(output_dir, f"step{i}_smoothed.ply"))
-    #if print_progress:
-    #    print("✅ Smoothed mesh.")
+    ms.apply_coord_two_steps_smoothing(normalthr=20.0, stepnormalnum=6, stepfitnum=6)
+    if save_intermediate:
+       ms.save_current_mesh(os.path.join(output_dir, f"step{i}_smoothed.ply"))
+    if print_progress:
+       print("✅ Smoothed mesh.")
 
     i += 1
 
@@ -60,26 +69,7 @@ def process_mesh(
 
     i += 1
 
-    # Step 1: Remove isolated pieces
-    #ms.meshing_remove_connected_component_by_diameter()
-    #if save_intermediate:
-    #    ms.save_current_mesh(os.path.join(output_dir, f"step{i}_removed_isolated.ply"))
-    #if print_progress:
-    #    print("✅ Removed isolated pieces.")
-
-    i += 1
-
-    # Step 4: HC Laplacian smoothing
-    #for _ in range(stepsmoothnum):
-    #    ms.apply_coord_hc_laplacian_smoothing()
-    #if save_intermediate:
-    #    ms.save_current_mesh(os.path.join(output_dir, f"step{i}_hc_smoothing.ply"))
-    #if print_progress:
-    #    print("✅ HC Laplacian smoothing completed.")
-
-    i += 1
-
-    # Step 5: Simplify mesh
+    # Step 4: Simplify mesh
     ms.meshing_decimation_quadric_edge_collapse(
         targetperc=targetperc,
         preservetopology=False,
