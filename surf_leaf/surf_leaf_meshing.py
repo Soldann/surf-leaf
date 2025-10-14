@@ -249,6 +249,7 @@ class SurfLeafMesher:
                     stepsmoothnum=self.postprocess_stepsmoothnum,
                     targetperc=self.postprocess_targetperc,
                     print_progress=False,
+                    output_dir=(self.output_dir / 'processed_steps/')
                 )
                 CONSOLE.print("Saving cleaned mesh to ", clean_mesh_path)
                 cleaned_meshset.save_current_mesh(clean_mesh_path)
