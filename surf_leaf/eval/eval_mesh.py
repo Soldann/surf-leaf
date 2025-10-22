@@ -259,8 +259,14 @@ def get_scale_from_dataparser(config_path: Path) -> float:
 
 def main(args):
     config_path = Path(args.config)
-    dataset_path = get_dataset_path_from_config(config_path)
-    nerfstudio_scale = get_scale_from_dataparser(config_path)
+    if config_path.exists() and config_path.suffix == ".yaml":
+        print(f"Using Nerfstudio config file: {config_path}")
+        dataset_path = get_dataset_path_from_config(config_path)
+        nerfstudio_scale = get_scale_from_dataparser(config_path)
+    else:
+        print(f"No Nerfstudio config.yaml found, treating {config_path} as dataset path...")
+        dataset_path = config_path
+        nerfstudio_scale = args.mesh_scale
     mesh_paths = []
     for pattern in args.input_mesh:
         mesh_paths.extend([Path(p) for p in glob.glob(str(pattern), recursive=True)])
@@ -277,13 +283,15 @@ def main(args):
 @dataclass
 class Args:
     config: Path
-    """Path to the config.yaml file in the Nerfstudio output"""
+    """Path to the config.yaml file in the Nerfstudio output OR path to the dataset folder containing transforms.json"""
     input_mesh: List[Path]
     """Input mesh file or glob pattern. Supports multiple patterns."""
     debug: bool = False
     """Enable to visualize the ICP alignment result."""
     shared_alignment_transform: bool = False
     """If true, use the same alignment transform for all meshes and remove all other randomness. Otherwise, compute a separate transform for each mesh."""
+    mesh_scale: float = 1.0
+    """Scaling factor to apply to the GT mesh for comparison. If using a Nerfstudio config.yaml, this is ignored in favor of the scale from dataparser_transforms.json."""
 
 if __name__ == "__main__":
     args = tyro.cli(Args)
