@@ -106,7 +106,7 @@ def load_transforms_json(path, remove_randomness:bool = False):
         else:
             raise RuntimeError("No valid point clouds could be generated from the dataset.")
 
-def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float, debug: bool = False, remove_randomness: bool = False, ransac_transform: Optional[np.ndarray] = None):
+def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float, debug: bool = False, remove_randomness: bool = False, ransac_transform: Optional[np.ndarray] = None, skip_alignment: bool = False):
     """Reads and processes the dataset."""
     dataset_path = Path(dataset_path)
     mesh_path = Path(mesh_path)
@@ -142,44 +142,51 @@ def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float
     vertex_count = mesh.vertex.positions.shape[0]
     face_count = mesh.triangle.indices.shape[0] if hasattr(mesh, "triangle") and hasattr(mesh.triangle, "indices") else 0
 
-    center = o3d.core.Tensor([0,0,0])
-    pcd_scaled = pcd.scale(nerfstudio_scale, center)
-
     # Filter out values that are too high, which would correspond with sky artifacts if the point cloud is generated from a NeRF dataset.
-    threshold = 10.0  # Adjust this as needed
+    threshold = 100.0  # Adjust this as needed
 
     # Compute the Euclidean distance from the origin
-    distances = np.linalg.norm(pcd_scaled.point.positions.numpy(), axis=1)
+    distances = np.linalg.norm(pcd.point.positions.numpy(), axis=1)
 
     # Create a mask for points within the threshold
     indices = np.where(distances < threshold)[0]
 
     # Apply the mask to filter points
-    filtered_pcd = pcd_scaled.select_by_index(o3d.core.Tensor(indices))
+    filtered_pcd = pcd.select_by_index(o3d.core.Tensor(indices))
     if remove_randomness:
         o3d.utility.random.seed(0)
     mesh_alignment_pcd = mesh.sample_points_uniformly(number_of_points=10000)  # Sample points from the mesh
 
-    if ransac_transform is None:
-        print("Computing alignment transform using ICP...")
-        # Align the point cloud with the mesh using ICP
-        target_down, target_fpfh = pointcloud_alignment.preprocess_point_cloud(filtered_pcd, voxel_size=0.05)
-        source_down, source_fpfh = pointcloud_alignment.preprocess_point_cloud(mesh_alignment_pcd, voxel_size=0.05)
+    center = o3d.core.Tensor([0,0,0])
+    mesh_alignment_pcd = mesh_alignment_pcd.scale(1.0 / nerfstudio_scale, center)
 
-        # pcd_down = filtered_pcd.voxel_down_sample(voxel_size=0.05)
-        ransac_result = pointcloud_alignment.execute_global_registration(
-            source_down, target_down, source_fpfh, target_fpfh, voxel_size=0.05)
-        refined_result = pointcloud_alignment.refine_registration(
-            source_down, target_down, source_fpfh, target_fpfh, voxel_size=0.05, ransac_result=ransac_result)
-
+    if skip_alignment:
         if debug:
-            print("Drawing result")
-            pointcloud_alignment.draw_registration_result(mesh_alignment_pcd, filtered_pcd, refined_result.transformation)
+            print("Skipping alignment, drawing unaligned result")
+            pointcloud_alignment.draw_registration_result(mesh_alignment_pcd, filtered_pcd, np.eye(4))
 
-        ransac_transform = refined_result.transformation
+        aligned_mesh_pcd = mesh_alignment_pcd
+    else:
+        if ransac_transform is None:
+            print("Computing alignment transform using ICP...")
+            # Align the point cloud with the mesh using ICP
+            target_down, target_fpfh = pointcloud_alignment.preprocess_point_cloud(filtered_pcd, voxel_size=0.05)
+            source_down, source_fpfh = pointcloud_alignment.preprocess_point_cloud(mesh_alignment_pcd, voxel_size=0.05)
 
-    aligned_mesh_pcd = mesh_alignment_pcd.transform(ransac_transform)
+            # pcd_down = filtered_pcd.voxel_down_sample(voxel_size=0.05)
+            ransac_result = pointcloud_alignment.execute_global_registration(
+                source_down, target_down, source_fpfh, target_fpfh, voxel_size=0.05)
+            refined_result = pointcloud_alignment.refine_registration(
+                source_down, target_down, source_fpfh, target_fpfh, voxel_size=0.05, ransac_result=ransac_result)
 
+            if debug:
+                print("Drawing result")
+                pointcloud_alignment.draw_registration_result(mesh_alignment_pcd, filtered_pcd, refined_result.transformation)
+
+            ransac_transform = refined_result.transformation
+        aligned_mesh_pcd = mesh_alignment_pcd.transform(ransac_transform)
+
+    print("Computing metrics...")
     metrics = compute_metrics(filtered_pcd, aligned_mesh_pcd)
 
     # Add mesh statistics
@@ -262,7 +269,11 @@ def main(args):
     if config_path.exists() and config_path.suffix == ".yaml":
         print(f"Using Nerfstudio config file: {config_path}")
         dataset_path = get_dataset_path_from_config(config_path)
-        nerfstudio_scale = get_scale_from_dataparser(config_path)
+        if args.mesh_scale != 1.0:
+            print(f"Overwriting the mesh scale from the config file with the provided mesh_scale argument {args.mesh_scale}.")
+            nerfstudio_scale = args.mesh_scale
+        else:
+            nerfstudio_scale = get_scale_from_dataparser(config_path)
     else:
         print(f"No Nerfstudio config.yaml found, treating {config_path} as dataset path...")
         dataset_path = config_path
@@ -276,9 +287,9 @@ def main(args):
     for mesh_path in mesh_paths:
         print(f"Processing mesh: {mesh_path}")
         if args.shared_alignment_transform:
-            global_ransac_transform = process_dataset(dataset_path, mesh_path, nerfstudio_scale, args.debug, remove_randomness=args.shared_alignment_transform, ransac_transform=global_ransac_transform)
+            global_ransac_transform = process_dataset(dataset_path, mesh_path, nerfstudio_scale, args.debug, remove_randomness=args.shared_alignment_transform, ransac_transform=global_ransac_transform, skip_alignment=args.skip_alignment)
         else:
-            process_dataset(dataset_path, mesh_path, nerfstudio_scale, args.debug)
+            process_dataset(dataset_path, mesh_path, nerfstudio_scale, args.debug, skip_alignment=args.skip_alignment)
 
 @dataclass
 class Args:
@@ -290,6 +301,8 @@ class Args:
     """Enable to visualize the ICP alignment result."""
     shared_alignment_transform: bool = False
     """If true, use the same alignment transform for all meshes and remove all other randomness. Otherwise, compute a separate transform for each mesh."""
+    skip_alignment: bool = False
+    """If true, skip the alignment step and assume the mesh is already aligned to the ground-truth point cloud."""
     mesh_scale: float = 1.0
     """Scaling factor to apply to the GT mesh for comparison. If using a Nerfstudio config.yaml, this is ignored in favor of the scale from dataparser_transforms.json."""
 
