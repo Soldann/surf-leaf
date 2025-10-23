@@ -142,23 +142,23 @@ def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float
     vertex_count = mesh.vertex.positions.shape[0]
     face_count = mesh.triangle.indices.shape[0] if hasattr(mesh, "triangle") and hasattr(mesh.triangle, "indices") else 0
 
+    center = o3d.core.Tensor([0,0,0])
+    pcd_scaled = pcd.scale(nerfstudio_scale, center)
+
     # Filter out values that are too high, which would correspond with sky artifacts if the point cloud is generated from a NeRF dataset.
     threshold = 100.0  # Adjust this as needed
 
     # Compute the Euclidean distance from the origin
-    distances = np.linalg.norm(pcd.point.positions.numpy(), axis=1)
+    distances = np.linalg.norm(pcd_scaled.point.positions.numpy(), axis=1)
 
     # Create a mask for points within the threshold
     indices = np.where(distances < threshold)[0]
 
     # Apply the mask to filter points
-    filtered_pcd = pcd.select_by_index(o3d.core.Tensor(indices))
+    filtered_pcd = pcd_scaled.select_by_index(o3d.core.Tensor(indices))
     if remove_randomness:
         o3d.utility.random.seed(0)
     mesh_alignment_pcd = mesh.sample_points_uniformly(number_of_points=10000)  # Sample points from the mesh
-
-    center = o3d.core.Tensor([0,0,0])
-    mesh_alignment_pcd = mesh_alignment_pcd.scale(1.0 / nerfstudio_scale, center)
 
     if skip_alignment:
         if debug:
@@ -187,7 +187,7 @@ def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float
         aligned_mesh_pcd = mesh_alignment_pcd.transform(ransac_transform)
 
     print("Computing metrics...")
-    metrics = compute_metrics(filtered_pcd, aligned_mesh_pcd)
+    metrics = compute_metrics(filtered_pcd, aligned_mesh_pcd, nerfstudio_scale)
 
     # Add mesh statistics
     metrics["Mesh Vertex Count"] = vertex_count
@@ -203,7 +203,7 @@ def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float
 
     return ransac_transform
 
-def compute_metrics(pointcloud1: o3d.t.geometry.PointCloud, pointcloud2: o3d.t.geometry.PointCloud, f1_radius=0.009999999776482582):
+def compute_metrics(pointcloud1: o3d.t.geometry.PointCloud, pointcloud2: o3d.t.geometry.PointCloud, pcd_1_scale_factor: float, f1_radius=0.05):
     metrics = {}
 
     points1 = pointcloud1.point.positions
@@ -220,8 +220,8 @@ def compute_metrics(pointcloud1: o3d.t.geometry.PointCloud, pointcloud2: o3d.t.g
     nn1 = NearestNeighbors(n_neighbors=1, algorithm="brute").fit(pts1_np)
     dists21, inds21 = nn1.kneighbors(pts2_np, return_distance=True)
 
-    distances12 = o3d.core.Tensor(dists12.astype(np.float32), dtype=o3d.core.Dtype.Float32)
-    distances21 = o3d.core.Tensor(dists21.astype(np.float32), dtype=o3d.core.Dtype.Float32)
+    distances12 = o3d.core.Tensor(dists12.astype(np.float32), dtype=o3d.core.Dtype.Float32) * 1.0 / pcd_1_scale_factor
+    distances21 = o3d.core.Tensor(dists21.astype(np.float32), dtype=o3d.core.Dtype.Float32) * 1.0 / pcd_1_scale_factor
 
     metrics["Chamfer Distance 1->2"] = distances12.reshape(-1).mean(-1).item()
     metrics["Chamfer Distance 2->1"] = distances21.reshape(-1).mean(-1).item()
