@@ -146,17 +146,17 @@ def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float
     center = o3d.core.Tensor([0,0,0])
     pcd_scaled = pcd.scale(nerfstudio_scale, center)
 
-    # Filter out values that are too high, which would correspond with sky artifacts if the point cloud is generated from a NeRF dataset.
-    threshold = 100.0  # Adjust this as needed
+    # # Filter out values that are too high, which would correspond with sky artifacts if the point cloud is generated from a NeRF dataset.
+    # threshold = np.inf # Adjust this as needed
 
     # Compute the Euclidean distance from the origin
-    distances = np.linalg.norm(pcd_scaled.point.positions.numpy(), axis=1)
+    # distances = np.linalg.norm(pcd_scaled.point.positions.numpy(), axis=1)
 
     # Create a mask for points within the threshold
-    indices = np.where(distances < threshold)[0]
+    # indices = np.where(distances < threshold)[0]
 
     # Apply the mask to filter points
-    filtered_pcd = pcd_scaled.select_by_index(o3d.core.Tensor(indices))
+    # filtered_pcd = pcd_scaled.select_by_index(o3d.core.Tensor(indices))
     if remove_randomness:
         o3d.utility.random.seed(0)
     mesh_alignment_pcd = mesh.sample_points_uniformly(number_of_points=10000)  # Sample points from the mesh
@@ -164,14 +164,14 @@ def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float
     if skip_alignment:
         if debug:
             print("Skipping alignment, drawing unaligned result")
-            pointcloud_alignment.draw_registration_result(mesh_alignment_pcd, filtered_pcd, np.eye(4))
+            pointcloud_alignment.draw_registration_result(mesh_alignment_pcd, pcd_scaled, np.eye(4))
 
         aligned_mesh_pcd = mesh_alignment_pcd
     else:
         if ransac_transform is None:
             print("Computing alignment transform using ICP...")
             # Align the point cloud with the mesh using ICP
-            target_down, target_fpfh = pointcloud_alignment.preprocess_point_cloud(filtered_pcd, voxel_size=0.05)
+            target_down, target_fpfh = pointcloud_alignment.preprocess_point_cloud(pcd_scaled, voxel_size=0.05)
             source_down, source_fpfh = pointcloud_alignment.preprocess_point_cloud(mesh_alignment_pcd, voxel_size=0.05)
 
             # pcd_down = filtered_pcd.voxel_down_sample(voxel_size=0.05)
@@ -182,13 +182,13 @@ def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float
 
             if debug:
                 print("Drawing result")
-                pointcloud_alignment.draw_registration_result(mesh_alignment_pcd, filtered_pcd, refined_result.transformation)
+                pointcloud_alignment.draw_registration_result(mesh_alignment_pcd, pcd_scaled, refined_result.transformation)
 
             ransac_transform = refined_result.transformation
         aligned_mesh_pcd = mesh_alignment_pcd.transform(ransac_transform)
 
     print("Computing metrics...")
-    metrics = compute_metrics(filtered_pcd, aligned_mesh_pcd, nerfstudio_scale)
+    metrics = compute_metrics(pcd_scaled, aligned_mesh_pcd, nerfstudio_scale)
 
     # Add mesh statistics
     metrics["Mesh Vertex Count"] = vertex_count
