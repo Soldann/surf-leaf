@@ -2,6 +2,7 @@ import os
 import json
 import numpy as np
 import open3d as o3d
+import pandas as pd
 from open3d.t.geometry import Metric, MetricParameters
 import utils.pointcloud_alignment as pointcloud_alignment
 from pathlib import Path
@@ -106,7 +107,7 @@ def load_transforms_json(path, remove_randomness:bool = False):
         else:
             raise RuntimeError("No valid point clouds could be generated from the dataset.")
 
-def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float, debug: bool = False, remove_randomness: bool = False, ransac_transform: Optional[np.ndarray] = None, skip_alignment: bool = False):
+def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float, algo_name: str, debug: bool = False, remove_randomness: bool = False, ransac_transform: Optional[np.ndarray] = None, skip_alignment: bool = False):
     """Reads and processes the dataset."""
     dataset_path = Path(dataset_path)
     mesh_path = Path(mesh_path)
@@ -193,12 +194,18 @@ def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float
     metrics["Mesh Vertex Count"] = vertex_count
     metrics["Mesh Face Count"] = face_count
 
+    # Add dataset details
+    metrics["Dataset"] = str(dataset_path)
+    metrics["Mesh"] = str(mesh_path)
+    metrics["Algorithm"] = algo_name
+
     print(metrics)
 
-    # Save metrics as JSON in mesh parent directory
-    stats_path = mesh_path.parent / f"{mesh_path.stem}_stats.json"
+    # Save metrics as CSV in mesh parent directory
+    stats_path = mesh_path.parent / f"{mesh_path.stem}_stats.csv"
     with open(stats_path, "w") as f:
-        json.dump(metrics, f, indent=2)
+        df = pd.DataFrame([metrics])
+        df.to_csv(f, index=False)
     print(f"Saved stats to {stats_path}")
 
     return ransac_transform
@@ -287,9 +294,9 @@ def main(args):
     for mesh_path in mesh_paths:
         print(f"Processing mesh: {mesh_path}")
         if args.shared_alignment_transform:
-            global_ransac_transform = process_dataset(dataset_path, mesh_path, nerfstudio_scale, args.debug, remove_randomness=args.shared_alignment_transform, ransac_transform=global_ransac_transform, skip_alignment=args.skip_alignment)
+            global_ransac_transform = process_dataset(dataset_path, mesh_path, nerfstudio_scale, args.algo_name, args.debug, remove_randomness=args.shared_alignment_transform, ransac_transform=global_ransac_transform, skip_alignment=args.skip_alignment)
         else:
-            process_dataset(dataset_path, mesh_path, nerfstudio_scale, args.debug, skip_alignment=args.skip_alignment)
+            process_dataset(dataset_path, mesh_path, nerfstudio_scale, args.algo_name, args.debug, skip_alignment=args.skip_alignment)
 
 @dataclass
 class Args:
@@ -297,6 +304,8 @@ class Args:
     """Path to the config.yaml file in the Nerfstudio output OR path to the dataset folder containing transforms.json"""
     input_mesh: List[Path]
     """Input mesh file or glob pattern. Supports multiple patterns."""
+    algo_name: str
+    """Name of the algorithm or method used to generate the mesh."""
     debug: bool = False
     """Enable to visualize the ICP alignment result."""
     shared_alignment_transform: bool = False
