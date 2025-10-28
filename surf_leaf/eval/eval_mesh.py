@@ -13,6 +13,35 @@ from typing import List, Optional
 from dataclasses import dataclass
 from sklearn.neighbors import NearestNeighbors
 
+def save_stats_to_google_sheets(row: Optional[List] = None):
+    if row is None:
+        return
+
+    import gspread
+    from dotenv import load_dotenv
+    # Load Key from .env
+    load_dotenv()
+    credentials = {
+      "type": os.getenv("type"),
+      "project_id": os.getenv("project_id"),
+      "private_key_id": os.getenv("private_key_id"),
+      "private_key": os.getenv("private_key"),
+      "client_email": os.getenv("client_email"),
+      "client_id": os.getenv("client_id"),
+      "auth_uri": os.getenv("auth_uri"),
+      "token_uri": os.getenv("token_uri"),
+      "auth_provider_x509_cert_url": os.getenv("auth_provider_x509_cert_url"),
+      "client_x509_cert_url": os.getenv("client_x509_cert_url"),
+      "universe_domain": os.getenv("universe_domain"),
+    }
+    gc = gspread.service_account_from_dict(credentials)
+    sht = gc.open_by_url(os.getenv("google_sheet_url"))
+    worksheet = sht.worksheet("GL3D Raw Data")
+
+    # Write a test row
+    worksheet.append_row(row)
+
+
 def tree_merge_pointclouds(pointclouds, voxel_size=0.03, max_points=2000000, remove_randomness: bool = False):
     """Merge a list of pointclouds using tree merge for log(n) runtime."""
     import math
@@ -107,7 +136,17 @@ def load_transforms_json(path, remove_randomness:bool = False):
         else:
             raise RuntimeError("No valid point clouds could be generated from the dataset.")
 
-def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float, algo_name: str, debug: bool = False, remove_randomness: bool = False, ransac_transform: Optional[np.ndarray] = None, skip_alignment: bool = False):
+def process_dataset(
+        dataset_path: Path,
+        mesh_path: Path,
+        nerfstudio_scale: float,
+        algo_name: str,
+        debug: bool = False,
+        remove_randomness: bool = False,
+        ransac_transform: Optional[np.ndarray] = None,
+        skip_alignment: bool = False,
+        save_to_google_sheets: bool = False
+):
     """Reads and processes the dataset."""
     dataset_path = Path(dataset_path)
     mesh_path = Path(mesh_path)
@@ -188,7 +227,7 @@ def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float
         aligned_mesh_pcd = mesh_alignment_pcd.transform(ransac_transform)
 
     print("Computing metrics...")
-    metrics = compute_metrics(pcd_scaled, aligned_mesh_pcd, nerfstudio_scale)
+    metrics = compute_metrics(pcd_scaled, aligned_mesh_pcd, nerfstudio_scale, f1_radius=1/3)
 
     # Add mesh statistics
     metrics["Mesh Vertex Count"] = vertex_count
@@ -200,6 +239,24 @@ def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float
     metrics["Algorithm"] = algo_name
 
     print(metrics)
+
+    if save_to_google_sheets:
+        row = [
+            metrics["Chamfer Distance 1->2"],
+            metrics["Chamfer Distance 2->1"],
+            metrics["O3D Chamfer Distance (Sum)"],
+            metrics["Chamfer Distance (Mean)"],
+            metrics["Completeness"],
+            metrics["Accuracy"],
+            metrics["F1-Score"],
+            metrics["Mesh Vertex Count"],
+            metrics["Mesh Face Count"],
+            metrics["Dataset"],
+            metrics["Mesh"],
+            metrics["Algorithm"],
+        ]
+
+        save_stats_to_google_sheets(row)
 
     # Save metrics as CSV in mesh parent directory
     stats_path = mesh_path.parent / f"{mesh_path.stem}_stats.csv"
@@ -312,6 +369,8 @@ class Args:
     """If true, use the same alignment transform for all meshes and remove all other randomness. Otherwise, compute a separate transform for each mesh."""
     skip_alignment: bool = False
     """If true, skip the alignment step and assume the mesh is already aligned to the ground-truth point cloud."""
+    save_to_google_sheets: bool = False
+    """Automatically save the computed stats to a Google Sheets document specified in the .env file."""
     mesh_scale: float = 1.0
     """Scaling factor to apply to the GT mesh for comparison. If using a Nerfstudio config.yaml, this is ignored in favor of the scale from dataparser_transforms.json."""
 
