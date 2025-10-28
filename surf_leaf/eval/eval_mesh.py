@@ -159,7 +159,7 @@ def process_dataset(dataset_path: Path, mesh_path: Path, nerfstudio_scale: float
     # filtered_pcd = pcd_scaled.select_by_index(o3d.core.Tensor(indices))
     if remove_randomness:
         o3d.utility.random.seed(0)
-    mesh_alignment_pcd = mesh.sample_points_uniformly(number_of_points=10000)  # Sample points from the mesh
+    mesh_alignment_pcd = mesh.sample_points_uniformly(number_of_points=100000)  # Sample points from the mesh
 
     if skip_alignment:
         if debug:
@@ -273,7 +273,7 @@ def get_scale_from_dataparser(config_path: Path) -> float:
 
 def main(args):
     config_path = Path(args.config)
-    if config_path.exists() and config_path.suffix == ".yaml":
+    if config_path.exists() and (config_path.suffix == ".yml" or config_path.suffix == ".yaml"):
         print(f"Using Nerfstudio config file: {config_path}")
         dataset_path = get_dataset_path_from_config(config_path)
         if args.mesh_scale != 1.0:
