@@ -351,9 +351,27 @@ def main(args):
     for mesh_path in mesh_paths:
         print(f"Processing mesh: {mesh_path}")
         if args.shared_alignment_transform:
-            global_ransac_transform = process_dataset(dataset_path, mesh_path, nerfstudio_scale, args.algo_name, args.debug, remove_randomness=args.shared_alignment_transform, ransac_transform=global_ransac_transform, skip_alignment=args.skip_alignment)
+            global_ransac_transform = process_dataset(
+                dataset_path,
+                mesh_path,
+                nerfstudio_scale,
+                args.algo_name,
+                args.debug,
+                remove_randomness=args.shared_alignment_transform,
+                ransac_transform=global_ransac_transform,
+                skip_alignment=args.skip_alignment,
+                save_to_google_sheets=args.save_to_google_sheets
+            )
         else:
-            process_dataset(dataset_path, mesh_path, nerfstudio_scale, args.algo_name, args.debug, skip_alignment=args.skip_alignment)
+            process_dataset(
+                dataset_path,
+                mesh_path,
+                nerfstudio_scale,
+                args.algo_name,
+                args.debug,
+                skip_alignment=args.skip_alignment,
+                save_to_google_sheets=args.save_to_google_sheets
+            )
 
 @dataclass
 class Args:
